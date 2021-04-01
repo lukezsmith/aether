@@ -9,9 +9,10 @@
 const char callSign[] = "<AETHER> ";
 
 // Transmission Variables
+uint8_t volatile buffer = 0;  // buffer selector
 const int dataStringLength = 100;  // max length of TX dataString
-//char dataString[2][dataStringLength];
-char dataString[dataStringLength];  // TX dataString
+char dataString[2][dataStringLength]; // TX dataString
+//char dataString[dataStringLength];  // TX dataString
 char dataStringHeader[18];  // header substring for TX dataString
 uint8_t txByte = 0; // dataString current byte index indicator
 uint8_t txBit = 0; // txByte current bit indicator
@@ -31,6 +32,15 @@ void setup() {
 
   // Set header string to callsign
   sprintf(dataStringHeader, "%s", callSign);
+
+  // fill first buffer
+  updateDataString();
+
+  // switch buffers
+  buffer = !buffer;
+  
+  // fill second buffer
+  updateDataString();
   
   // Clear all interrupts
   cli();
@@ -61,7 +71,7 @@ void setup() {
 }
 
 void loop() {
-  updatedataString();
+  updateDataString();
 }
 
 ISR(TIMER1_COMPA_vect) {
@@ -70,12 +80,12 @@ ISR(TIMER1_COMPA_vect) {
   // if we are sending a new byte
   if (newByte) { 
     newByte = false;
-    //    currentByte = dataString[buffer][txByte];
-    currentByte = dataString[txByte];
+    currentByte = dataString[buffer][txByte];
+//    currentByte = dataString[txByte];
     txByte++;
     // if we have reached the end of the string or buffer reset all byte state indicators
     if (currentByte == '\0' || txByte > (dataStringLength - 1)) {  
-      //      buffer = !buffer; // switch buffers
+      buffer = !buffer; // switch buffers
       txByte = 0;
       currentByte = 0x00;
     }
@@ -125,7 +135,7 @@ ISR(TIMER1_COMPA_vect) {
 }
 
 // function to build the transmission dataString and store in buffer
-void updatedataString(){
+void updateDataString(){
   char tempData[dataStringLength];
   
   // disable interrupts temporarily to stop partial transmissions
@@ -150,7 +160,7 @@ void updatedataString(){
   strcat(tempData,"RTTY TEST BEACON RTTY TEST BEACON\n"); // Puts the text in the dataString
 
   // Store string in dataString buffer
-  sprintf(dataString, tempData);
+  sprintf(dataString[!buffer], tempData);
   
   // re-enable interrupts 
   sei();
