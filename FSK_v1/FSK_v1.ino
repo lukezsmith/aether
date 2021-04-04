@@ -3,7 +3,8 @@
 #include <string.h>
 
 // Pin Definitions
-#define TXPIN PB5 // Radio TX Pin
+#define TXPIN PD5 // Radio TX Pin
+#define RADIOLED PD7
 
 // General Variables
 const char callSign[] = "<AETHER> ";
@@ -12,7 +13,6 @@ const char callSign[] = "<AETHER> ";
 uint8_t volatile buffer = 0;  // buffer selector
 const int dataStringLength = 100;  // max length of TX dataString
 char dataString[2][dataStringLength]; // TX dataString
-//char dataString[dataStringLength];  // TX dataString
 char dataStringHeader[18];  // header substring for TX dataString
 uint8_t txByte = 0; // dataString current byte index indicator
 uint8_t txBit = 0; // txByte current bit indicator
@@ -46,7 +46,9 @@ void setup() {
   cli();
 
   // Set txPin to be output
-  DDRB |= (1 << TXPIN);
+//  DDRD |= (1 << TXPIN);
+//  DDRD |= (1 << RADIOLED);
+  DDRD |= (1 << TXPIN | 1 << RADIOLED);
 
   // Reset Timer1 Control Reg A
   TCCR1A = 0;
@@ -81,7 +83,6 @@ ISR(TIMER1_COMPA_vect) {
   if (newByte) { 
     newByte = false;
     currentByte = dataString[buffer][txByte];
-//    currentByte = dataString[txByte];
     txByte++;
     // if we have reached the end of the string or buffer reset all byte state indicators
     if (currentByte == '\0' || txByte > (dataStringLength - 1)) {  
@@ -96,7 +97,7 @@ ISR(TIMER1_COMPA_vect) {
   // if we are sending a start or stop bit (i.e no databit)
   if (!dataBit) { 
     if (startBit) {
-      PORTB &= ~(1 << TXPIN); // send start bit (0) 
+      PORTD &= ~(1 << TXPIN | 1 << RADIOLED); // send start bit (0) 
       
       // update state variables to expect data bits on next interrupt
       startBit = false;
@@ -104,7 +105,7 @@ ISR(TIMER1_COMPA_vect) {
       return;  // start bit sent, terminate interrupt
     }
     else { // else must be a stop -  twice then get ready for new byte.
-      PORTB |= (1 << TXPIN);  // send stop bit (1)
+      PORTD |= (1 << TXPIN | 1 << RADIOLED);  // send stop bit (1)
 
       // update stopBit state variable to handle the transmission of two stop bits instead of just one
       if (stopBit) {
@@ -120,10 +121,12 @@ ISR(TIMER1_COMPA_vect) {
   else { 
     // High bit (1)
     if (currentByte & (1 << txBit)) { 
-      PORTB |= (1 << TXPIN);
+      PORTD |= (1 << TXPIN | 1 << RADIOLED);  // send high bit (1)
     }
     // Low bit (0)
-    else PORTB &= ~(1 << TXPIN); 
+    else{
+      PORTD &= ~(1 << TXPIN | 1 << RADIOLED);  // send low bit (1)
+    }
     
     txBit++;
     // Check if the character's 7 bits have been sent, update state variables
